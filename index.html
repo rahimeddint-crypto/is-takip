@@ -186,7 +186,7 @@
         <!-- Section 2: Task Transition Buttons -->
         <div class="no-print">
             <h3 class="text-sm font-bold text-slate-600 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-hand-pointer text-blue-600"></i> İş Geçiş Butonları (Tıkla ve Geç)
+                <i class="fa-solid fa-hand-pointer text-blue-600"></i> İş Geçiş Butonları (Tıkla và Geç)
             </h3>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <button onclick="switchTask('Temizlik')" id="btn-temizlik" class="group relative bg-white border-2 border-slate-200 text-slate-800 p-5 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col items-center justify-center text-center">
@@ -381,7 +381,6 @@
 
     <!-- Application JavaScript Logic with Firebase Integration -->
     <script>
-        // Firebase Konfigürasyonu
         const firebaseConfig = {
             apiKey: "AIzaSyAO2a5rV-xN6etKlfr3drW_1s5Dk3UY_1M",
             authDomain: "is-takip-appa.firebaseapp.com",
@@ -423,7 +422,6 @@
         });
 
         function initFirebaseListeners() {
-            // Logs Dinleyici
             db.ref('is_takip/logs').on('value', (snapshot) => {
                 const data = snapshot.val();
                 logs = data ? Object.values(data) : [];
@@ -433,7 +431,6 @@
                 console.error("Firebase log okuma hatası:", error);
             });
 
-            // Aktif Görev Dinleyici
             db.ref('is_takip/activeTask').on('value', (snapshot) => {
                 activeTask = snapshot.val();
                 renderApp();
@@ -487,15 +484,15 @@
             const now = new Date();
             const nowISO = now.toISOString();
 
-            if (activeTask) {
-                if (activeTask.taskName === newTaskName) return;
+            if (activeTask && activeTask.name) {
+                if (activeTask.name === newTaskName) return;
 
                 const startTime = new Date(activeTask.startTimeISO);
                 const durationSeconds = Math.max(1, Math.floor((now.getTime() - startTime.getTime()) / 1000));
 
                 const logEntry = {
                     id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-                    taskName: activeTask.taskName,
+                    taskName: activeTask.name,
                     startTimeISO: activeTask.startTimeISO,
                     endTimeISO: nowISO,
                     durationSeconds: durationSeconds,
@@ -506,7 +503,7 @@
             }
 
             const newActive = {
-                taskName: newTaskName,
+                name: newTaskName,
                 startTimeISO: nowISO
             };
 
@@ -514,7 +511,7 @@
         }
 
         function stopCurrentTask() {
-            if (!activeTask) return;
+            if (!activeTask || !activeTask.name) return;
 
             const now = new Date();
             const nowISO = now.toISOString();
@@ -523,7 +520,7 @@
 
             const logEntry = {
                 id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-                taskName: activeTask.taskName,
+                taskName: activeTask.name,
                 startTimeISO: activeTask.startTimeISO,
                 endTimeISO: nowISO,
                 durationSeconds: durationSeconds,
@@ -554,12 +551,13 @@
                 }
             });
 
-            if (activeTask && activeTask.taskName) {
-                const config = taskConfig[activeTask.taskName] || {};
+            // FIX: Read activeTask.name correctly as stored in database
+            if (activeTask && activeTask.name) {
+                const config = taskConfig[activeTask.name] || {};
                 const startDate = new Date(activeTask.startTimeISO);
 
                 if (titleEl) {
-                    titleEl.innerText = activeTask.taskName;
+                    titleEl.innerText = activeTask.name;
                     titleEl.className = "text-2xl sm:text-3xl font-extrabold text-slate-900";
                 }
 
@@ -571,11 +569,11 @@
                 if (startEl) startEl.innerText = formatTimeOnly(startDate);
                 
                 const diffSec = Math.max(0, Math.floor((new Date().getTime() - startDate.getTime()) / 1000));
-                if (timerEl) timerEl.innerText = formatSecondsToHMS(diffSec);
+                if (timerElem) timerElem.innerText = formatSecondsToHMS(diffSec);
 
                 if (stopBtn) stopBtn.classList.remove('hidden');
 
-                const activeBtnId = `btn-${activeTask.taskName.toLowerCase()}`;
+                const activeBtnId = `btn-${activeTask.name.toLowerCase()}`;
                 const activeBtn = document.getElementById(activeBtnId);
                 if (activeBtn) {
                     activeBtn.className += ` ${config.btnActiveBorder || 'border-blue-500 bg-blue-50'} pulse-active`;
@@ -597,7 +595,7 @@
                 }
 
                 if (startEl) startEl.innerText = "--:--:--";
-                if (timerEl) timerEl.innerText = "00:00:00";
+                if (timerElem) timerElem.innerText = "00:00:00";
                 if (stopBtn) stopBtn.classList.add('hidden');
 
                 if (activeCard) {
@@ -627,9 +625,10 @@
             };
 
             filteredByMonth.forEach(log => {
-                if (stats[log.taskName]) {
-                    stats[log.taskName].totalSec += (log.durationSeconds || 0);
-                    stats[log.taskName].count += 1;
+                const tName = log.taskName || log.name;
+                if (stats[tName]) {
+                    stats[tName].totalSec += (log.durationSeconds || 0);
+                    stats[tName].count += 1;
                 }
                 stats.GrandTotal.totalSec += (log.durationSeconds || 0);
                 stats.GrandTotal.count += 1;
@@ -685,17 +684,18 @@
                 const startTimeStr = formatTimeOnly(startDate);
                 const endTimeStr = endDate ? formatTimeOnly(endDate) : 'Devam ediyor';
                 const durationStr = formatSecondsToHMS(log.durationSeconds || 0);
+                const taskNameDisplay = log.taskName || log.name || '';
 
                 let badgeClass = "bg-slate-100 text-slate-800";
-                if (log.taskName === 'Temizlik') badgeClass = "bg-sky-100 text-sky-800 border-sky-200";
-                if (log.taskName === 'Muhasebe') badgeClass = "bg-emerald-100 text-emerald-800 border-emerald-200";
-                if (log.taskName === 'Teknoloji') badgeClass = "bg-purple-100 text-purple-800 border-purple-200";
+                if (taskNameDisplay === 'Temizlik') badgeClass = "bg-sky-100 text-sky-800 border-sky-200";
+                if (taskNameDisplay === 'Muhasebe') badgeClass = "bg-emerald-100 text-emerald-800 border-emerald-200";
+                if (taskNameDisplay === 'Teknoloji') badgeClass = "bg-purple-100 text-purple-800 border-purple-200";
 
                 tr.innerHTML = `
                     <td class="py-3 px-4 font-medium text-slate-600 whitespace-nowrap">${dateFormatted}</td>
                     <td class="py-3 px-4 font-bold whitespace-nowrap">
                         <span class="px-2.5 py-1 rounded-md text-xs border ${badgeClass}">
-                            ${escapeHtml(log.taskName || '')}
+                            ${escapeHtml(taskNameDisplay)}
                         </span>
                     </td>
                     <td class="py-3 px-4 font-mono text-slate-700 whitespace-nowrap">${startTimeStr}</td>
@@ -791,9 +791,10 @@
                 const startStr = formatTimeOnly(startDate);
                 const endStr = endDate ? formatTimeOnly(endDate) : 'Devam ediyor';
                 const durationHMS = formatSecondsToHMS(log.durationSeconds || 0);
+                const tName = log.taskName || log.name || '';
                 const note = (log.note || '').replace(/;/g, ',');
 
-                csvContent += `"${dateStr}";"${log.taskName}";"${startStr}";"${endStr}";"${durationHMS}";"${log.durationSeconds || 0}";"${note}"\n`;
+                csvContent += `"${dateStr}";"${tName}";"${startStr}";"${endStr}";"${durationHMS}";"${log.durationSeconds || 0}";"${note}"\n`;
             });
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -852,6 +853,10 @@
             const s = String(dateObj.getSeconds()).padStart(2, '0');
             return `${h}:${m}:${s}`;
         }
+
+        (function formatDateTR(dateObj) {
+            // helper dummy
+        });
 
         function formatDateTR(dateObj) {
             if (isNaN(dateObj.getTime())) return '-';
