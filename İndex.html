@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İş Takip ve Geçiş Programı</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; color: black !important; }
+            .print-shadow { box-shadow: none !important; border: 1px solid #ccc; }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between">
+
+    <!-- Üst Bar -->
+    <header class="bg-slate-800 border-b border-slate-700 shadow-md sticky top-0 z-50 no-print">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="bg-emerald-500 text-slate-950 font-black px-3 py-1.5 rounded-lg text-lg tracking-wider shadow">İ-TAKİP</div>
+                <div>
+                    <h1 class="text-lg font-bold text-white leading-tight">İş Geçiş Takip Sistemi</h1>
+                    <p class="text-xs text-slate-400">Temizlik • Muhasebe • Teknoloji</p>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 flex items-center space-x-4 shadow-inner">
+                <div class="text-right">
+                    <div id="live-date" class="text-xs text-slate-400 font-medium">--.--.----</div>
+                    <div id="live-time" class="text-xl font-mono font-bold text-emerald-400 tracking-wider">00:00:00</div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="exportExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow flex items-center gap-1.5">
+                    📊 Excel (CSV) İndir
+                </button>
+                <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow flex items-center gap-1.5">
+                    🖨️ Yazdır / PDF
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Ana İçerik -->
+    <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow space-y-6">
+
+        <div class="bg-gradient-to-r from-slate-800 to-slate-800/80 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 print-shadow">
+            <div class="flex items-center space-x-4 w-full md:w-auto">
+                <div id="active-indicator-dot" class="w-4 h-4 rounded-full bg-slate-500 animate-pulse"></div>
+                <div>
+                    <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Şu An Yapılan İş</span>
+                    <h2 id="current-task-name" class="text-2xl font-black text-white">Yükleniyor...</h2>
+                </div>
+            </div>
+            <div class="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-slate-700">
+                <div class="text-left md:text-right">
+                    <span class="text-xs text-slate-400 block">Başlangıç Saati</span>
+                    <span id="current-task-start" class="font-mono text-base font-bold text-slate-200">--:--:--</span>
+                </div>
+                <div class="text-left md:text-right">
+                    <span class="text-xs text-slate-400 block">Geçen Süre</span>
+                    <span id="current-task-duration" class="font-mono text-lg font-extrabold text-emerald-400">00:00:00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 no-print">
+            <button onclick="switchTask('Temizlik')" id="btn-Temizlik" class="group relative bg-slate-800 hover:bg-slate-750 border-2 border-slate-700 hover:border-blue-500 p-5 rounded-2xl transition-all duration-200 text-left shadow-lg flex flex-col justify-between overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/25 transition"></div>
+                <span class="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3 block">1. İş</span>
+                <div class="flex justify-between items-end">
+                    <span class="text-xl font-bold text-white">🧹 Temizlik</span>
+                    <span class="text-xs bg-blue-500/20 text-blue-300 px-2.5 py-1 rounded-lg font-medium">Geçiş Yap</span>
+                </div>
+            </button>
+
+            <button onclick="switchTask('Muhasebe')" id="btn-Muhasebe" class="group relative bg-slate-800 hover:bg-slate-750 border-2 border-slate-700 hover:border-amber-500 p-5 rounded-2xl transition-all duration-200 text-left shadow-lg flex flex-col justify-between overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/25 transition"></div>
+                <span class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3 block">2. İş</span>
+                <div class="flex justify-between items-end">
+                    <span class="text-xl font-bold text-white">📑 Muhasebe</span>
+                    <span class="text-xs bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-lg font-medium">Geçiş Yap</span>
+                </div>
+            </button>
+
+            <button onclick="switchTask('Teknoloji')" id="btn-Teknoloji" class="group relative bg-slate-800 hover:bg-slate-750 border-2 border-slate-700 hover:border-purple-500 p-5 rounded-2xl transition-all duration-200 text-left shadow-lg flex flex-col justify-between overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-xl group-hover:bg-purple-500/25 transition"></div>
+                <span class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-3 block">3. İş</span>
+                <div class="flex justify-between items-end">
+                    <span class="text-xl font-bold text-white">💻 Teknoloji</span>
+                    <span class="text-xs bg-purple-500/20 text-purple-300 px-2.5 py-1 rounded-lg font-medium">Geçiş Yap</span>
+                </div>
+            </button>
+        </div>
+
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg print-shadow">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4 pb-4 border-b border-slate-700">
+                <div>
+                    <h3 class="text-lg font-bold text-white">Geçmiş Geçiş ve Süre Kayıtları</h3>
+                    <p class="text-xs text-slate-400">Bulut senkronize ortak geçiş günlüğü.</p>
+                </div>
+                <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+                    <select id="month-filter" onchange="renderTable()" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 outline-none focus:border-emerald-500">
+                    </select>
+                    <button onclick="clearHistory()" class="no-print bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs px-3 py-2 rounded-xl transition font-medium">
+                        🗑️ Tüm Kayıtları Sıfırla
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wider">
+                            <th class="py-3 px-4 font-semibold">Tarih</th>
+                            <th class="py-3 px-4 font-semibold">İş Adı</th>
+                            <th class="py-3 px-4 font-semibold">Başlangıç</th>
+                            <th class="py-3 px-4 font-semibold">Bitiş</th>
+                            <th class="py-3 px-4 font-semibold text-right">Toplam Süre</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-table-body" class="divide-y divide-slate-750 text-sm text-slate-300 font-mono">
+                        <tr>
+                            <td colspan="5" class="text-center py-6 text-slate-500 italic font-sans">Yükleniyor...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-slate-800 border-t border-slate-700 py-4 text-center text-xs text-slate-500 no-print">
+        İş Takip Programı &bull; Bulut Senkronize Aktif ☁️
+    </footer>
+
+    <script>
+        // Sizin Firebase Veritabanı Bilgileriniz Entegre Edildi
+        const firebaseConfig = {
+            apiKey: "AIzaSyA_fRLWjlLpBkrVAIRdKEZApQwFEp6KmyM",
+            authDomain: "is-takip-sistemi-5f634.firebaseapp.com",
+            databaseURL: "https://is-takip-sistemi-5f634-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "is-takip-sistemi-5f634",
+            storageBucket: "is-takip-sistemi-5f634.firebasestorage.app",
+            messagingSenderId: "1058536343996",
+            appId: "1:1058536343996:web:7991594929a714dabc43b9",
+            measurementId: "G-SSJJX60S2D"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let logs = [];
+        let activeTask = null;
+
+        db.ref('is_takip/logs').on('value', (snapshot) => {
+            const data = snapshot.val();
+            logs = data ? Object.values(data) : [];
+            logs.sort((a, b) => b.id - a.id);
+            populateMonthFilter();
+            renderTable();
+        }, (error) => {
+            console.error(error);
+            document.getElementById('log-table-body').innerHTML = `<tr><td colspan="5" class="text-center py-6 text-rose-400 italic font-sans">Bağlantı kurulamadı.</td></tr>`;
+        });
+
+        db.ref('is_takip/activeTask').on('value', (snapshot) => {
+            activeTask = snapshot.val();
+            updateActiveUI();
+        });
+
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('live-date').innerText = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            document.getElementById('live-time').innerText = now.toTimeString().split(' ')[0] + '.' + String(Math.floor(now.getMilliseconds() / 100)).padStart(1, '0');
+
+            if (activeTask) {
+                const startTime = new Date(activeTask.startTimestamp);
+                const diffSec = Math.floor((now - startTime) / 1000);
+                if (diffSec >= 0) {
+                    const h = String(Math.floor(diffSec / 3600)).padStart(2, '0');
+                    const m = String(Math.floor((diffSec % 3600) / 60)).padStart(2, '0');
+                    const s = String(diffSec % 60).padStart(2, '0');
+                    document.getElementById('current-task-duration').innerText = `${h}:${m}:${s}`;
+                }
+            }
+        }, 100);
+
+        function switchTask(taskName) {
+            const now = new Date();
+            const timestampNow = now.toISOString();
+            const timeStringFormatted = now.toTimeString().split(' ')[0] + '.' + String(Math.floor(now.getMilliseconds() / 100)).padStart(1, '0');
+            const dateStringFormatted = now.toLocaleDateString('tr-TR');
+
+            if (activeTask && activeTask.name !== taskName) {
+                const startObj = new Date(activeTask.startTimestamp);
+                const durationSec = Math.floor((now - startObj) / 1000);
+                
+                const newLog = {
+                    id: Date.now(),
+                    date: dateStringFormatted,
+                    task: activeTask.name,
+                    start: activeTask.startTimeFormatted,
+                    end: timeStringFormatted,
+                    durationSec: durationSec,
+                    durationFormatted: formatSeconds(durationSec),
+                    sortMonth: now.toISOString().slice(0, 7)
+                };
+                
+                db.ref('is_takip/logs/' + newLog.id).set(newLog);
+            }
+
+            const newActive = {
+                name: taskName,
+                startTimestamp: timestampNow,
+                startTimeFormatted: timeStringFormatted,
+                sortMonth: now.toISOString().slice(0, 7)
+            };
+
+            db.ref('is_takip/activeTask').set(newActive);
+        }
+
+        function updateActiveUI() {
+            ['Temizlik', 'Muhasebe', 'Teknoloji'].forEach(t => {
+                const btn = document.getElementById(`btn-${t}`);
+                if (btn) btn.classList.remove('border-emerald-500', 'bg-slate-750');
+            });
+
+            if (activeTask) {
+                document.getElementById('current-task-name').innerText = activeTask.name;
+                document.getElementById('current-task-start').innerText = activeTask.startTimeFormatted;
+                document.getElementById('active-indicator-dot').className = "w-4 h-4 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]";
+                
+                const activeBtn = document.getElementById(`btn-${activeTask.name}`);
+                if (activeBtn) {
+                    activeBtn.classList.add('border-emerald-500', 'bg-slate-750');
+                }
+            } else {
+                document.getElementById('current-task-name').innerText = "Seçim Yapılmadı";
+                document.getElementById('current-task-start').innerText = "--:--:--";
+                document.getElementById('current-task-duration').innerText = "00:00:00";
+                document.getElementById('active-indicator-dot').className = "w-4 h-4 rounded-full bg-slate-500";
+            }
+        }
+
+        function formatSeconds(sec) {
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            if (h > 0) return `${h} sa ${m} dk ${s} sn`;
+            if (m > 0) return `${m} dk ${s} sn`;
+            return `${s} sn`;
+        }
+
+        function populateMonthFilter() {
+            const monthFilter = document.getElementById('month-filter');
+            if (!monthFilter) return;
+            const currentSelection = monthFilter.value;
+            
+            const months = [...new Set(logs.map(l => l.sortMonth))];
+            const currentMonthKey = new Date().toISOString().slice(0, 7);
+            if (!months.includes(currentMonthKey)) months.unshift(currentMonthKey);
+            
+            months.sort().reverse();
+
+            monthFilter.innerHTML = '<option value="ALL">Tüm Zamanlar</option>';
+            months.forEach(m => {
+                const [year, month] = m.split('-');
+                const dateObj = new Date(year, month - 1);
+                const monthName = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.innerText = monthName;
+                monthFilter.appendChild(opt);
+            });
+
+            if (currentSelection && months.includes(currentSelection)) {
+                monthFilter.value = currentSelection;
+            }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('log-table-body');
+            const monthFilterElem = document.getElementById('month-filter');
+            if (!tbody || !monthFilterElem) return;
+            
+            const selectedMonth = monthFilterElem.value;
+
+            let filteredLogs = logs;
+            if (selectedMonth && selectedMonth !== 'ALL') {
+                filteredLogs = logs.filter(l => l.sortMonth === selectedMonth);
+            }
+
+            if (filteredLogs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500 italic font-sans">Kayıt bulunamadı.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filteredLogs.map(l => `
+                <tr class="hover:bg-slate-750/50 transition">
+                    <td class="py-3 px-4 text-slate-400 text-xs">${l.date}</td>
+                    <td class="py-3 px-4 font-bold text-white font-sans">${l.task}</td>
+                    <td class="py-3 px-4 text-emerald-400">${l.start}</td>
+                    <td class="py-3 px-4 text-rose-400">${l.end}</td>
+                    <td class="py-3 px-4 text-right font-semibold text-slate-200">${l.durationFormatted}</td>
+                </tr>
+            `).join('');
+        }
+
+        function clearHistory() {
+            if (confirm("Buluttaki tüm geçmiş kayıtları silmek istediğinize emin misiniz?")) {
+                db.ref('is_takip').remove();
+            }
+        }
+
+        function exportExcel() {
+            if (logs.length === 0) {
+                alert("Dışa aktarılacak kayıt bulunmuyor.");
+                return;
+            }
+
+            let csvContent = "\uFEFFTarih;İş Adı;Başlangıç Saati;Bitiş Saati;Toplam Süre\n";
+            logs.forEach(l => {
+                csvContent += `"${l.date}";"${l.task}";"${l.start}";"${l.end}";"${l.durationFormatted}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `is-takip-raporu-${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
