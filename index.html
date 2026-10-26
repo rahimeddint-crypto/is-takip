@@ -186,7 +186,7 @@
         <!-- Section 2: Task Transition Buttons -->
         <div class="no-print">
             <h3 class="text-sm font-bold text-slate-600 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-hand-pointer text-blue-600"></i> İş Geçiş Butonları (Tıkla và Geç)
+                <i class="fa-solid fa-hand-pointer text-blue-600"></i> İş Geçiş Butonları (Tıkla ve Geç)
             </h3>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <button onclick="switchTask('Temizlik')" id="btn-temizlik" class="group relative bg-white border-2 border-slate-200 text-slate-800 p-5 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col items-center justify-center text-center">
@@ -277,7 +277,7 @@
                 <div>
                     <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
                         <i class="fa-solid fa-list-check text-blue-600 no-print"></i>
-                        İş Geçiş ve Zaman Kayıt Günlüğü
+                        İş Geçiş và Zaman Kayıt Günlüğü
                     </h3>
                     <p class="text-xs text-slate-500">Tüm geçiş saatleri bulut veritabanında saklanır ve anlık senkronize edilir.</p>
                 </div>
@@ -425,7 +425,7 @@
             db.ref('is_takip/logs').on('value', (snapshot) => {
                 const data = snapshot.val();
                 logs = data ? Object.values(data) : [];
-                logs.sort((a, b) => new Date(b.startTimeISO) - new Date(a.startTimeISO));
+                logs.sort((a, b) => new Date(b.startTimeISO || b.startTimestamp) - new Date(a.startTimeISO || a.startTimestamp));
                 renderApp();
             }, (error) => {
                 console.error("Firebase log okuma hatası:", error);
@@ -470,12 +470,15 @@
                 if (dayElem) dayElem.innerText = dayName;
                 if (dateElem) dateElem.innerText = dateStr;
 
-                if (activeTask && activeTask.startTimeISO) {
-                    const startMs = new Date(activeTask.startTimeISO).getTime();
-                    const nowMs = now.getTime();
-                    const diffSec = Math.max(0, Math.floor((nowMs - startMs) / 1000));
-                    const timerElem = document.getElementById('active-task-timer');
-                    if (timerElem) timerElem.innerText = formatSecondsToHMS(diffSec);
+                if (activeTask) {
+                    const startTimestampStr = activeTask.startTimeISO || activeTask.startTimestamp;
+                    if (startTimestampStr) {
+                        const startMs = new Date(startTimestampStr).getTime();
+                        const nowMs = now.getTime();
+                        const diffSec = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+                        const timerElem = document.getElementById('active-task-timer');
+                        if (timerElem) timerElem.innerText = formatSecondsToHMS(diffSec);
+                    }
                 }
             }, 1000);
         }
@@ -484,16 +487,19 @@
             const now = new Date();
             const nowISO = now.toISOString();
 
-            if (activeTask && activeTask.name) {
-                if (activeTask.name === newTaskName) return;
+            const currentActiveName = activeTask ? (activeTask.name || activeTask.taskName) : null;
 
-                const startTime = new Date(activeTask.startTimeISO);
+            if (currentActiveName) {
+                if (currentActiveName === newTaskName) return;
+
+                const startTimestampStr = activeTask.startTimeISO || activeTask.startTimestamp;
+                const startTime = new Date(startTimestampStr);
                 const durationSeconds = Math.max(1, Math.floor((now.getTime() - startTime.getTime()) / 1000));
 
                 const logEntry = {
                     id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-                    taskName: activeTask.name,
-                    startTimeISO: activeTask.startTimeISO,
+                    taskName: currentActiveName,
+                    startTimeISO: startTimestampStr,
                     endTimeISO: nowISO,
                     durationSeconds: durationSeconds,
                     note: 'İş geçişi yapıldı'
@@ -504,24 +510,27 @@
 
             const newActive = {
                 name: newTaskName,
-                startTimeISO: nowISO
+                startTimeISO: nowISO,
+                startTimestamp: nowISO
             };
 
             db.ref('is_takip/activeTask').set(newActive);
         }
 
         function stopCurrentTask() {
-            if (!activeTask || !activeTask.name) return;
+            const currentActiveName = activeTask ? (activeTask.name || activeTask.taskName) : null;
+            if (!currentActiveName) return;
 
             const now = new Date();
             const nowISO = now.toISOString();
-            const startTime = new Date(activeTask.startTimeISO);
+            const startTimestampStr = activeTask.startTimeISO || activeTask.startTimestamp;
+            const startTime = new Date(startTimestampStr);
             const durationSeconds = Math.max(1, Math.floor((now.getTime() - startTime.getTime()) / 1000));
 
             const logEntry = {
                 id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-                taskName: activeTask.name,
-                startTimeISO: activeTask.startTimeISO,
+                taskName: currentActiveName,
+                startTimeISO: startTimestampStr,
                 endTimeISO: nowISO,
                 durationSeconds: durationSeconds,
                 note: 'Görevi bitirme işlemi'
@@ -551,13 +560,15 @@
                 }
             });
 
-            // FIX: Read activeTask.name correctly as stored in database
-            if (activeTask && activeTask.name) {
-                const config = taskConfig[activeTask.name] || {};
-                const startDate = new Date(activeTask.startTimeISO);
+            const currentActiveName = activeTask ? (activeTask.name || activeTask.taskName) : null;
+
+            if (currentActiveName) {
+                const config = taskConfig[currentActiveName] || {};
+                const startTimestampStr = activeTask.startTimeISO || activeTask.startTimestamp;
+                const startDate = new Date(startTimestampStr);
 
                 if (titleEl) {
-                    titleEl.innerText = activeTask.name;
+                    titleEl.innerText = currentActiveName;
                     titleEl.className = "text-2xl sm:text-3xl font-extrabold text-slate-900";
                 }
 
@@ -568,12 +579,14 @@
 
                 if (startEl) startEl.innerText = formatTimeOnly(startDate);
                 
-                const diffSec = Math.max(0, Math.floor((new Date().getTime() - startDate.getTime()) / 1000));
-                if (timerElem) timerElem.innerText = formatSecondsToHMS(diffSec);
+                if (startTimestampStr) {
+                    const diffSec = Math.max(0, Math.floor((new Date().getTime() - startDate.getTime()) / 1000));
+                    if (timerEl) timerEl.innerText = formatSecondsToHMS(diffSec);
+                }
 
                 if (stopBtn) stopBtn.classList.remove('hidden');
 
-                const activeBtnId = `btn-${activeTask.name.toLowerCase()}`;
+                const activeBtnId = `btn-${currentActiveName.toLowerCase()}`;
                 const activeBtn = document.getElementById(activeBtnId);
                 if (activeBtn) {
                     activeBtn.className += ` ${config.btnActiveBorder || 'border-blue-500 bg-blue-50'} pulse-active`;
@@ -595,7 +608,7 @@
                 }
 
                 if (startEl) startEl.innerText = "--:--:--";
-                if (timerElem) timerElem.innerText = "00:00:00";
+                if (timerEl) timerEl.innerText = "00:00:00";
                 if (stopBtn) stopBtn.classList.add('hidden');
 
                 if (activeCard) {
@@ -612,9 +625,11 @@
             const dayVal = dayElem ? dayElem.value : '';
 
             const filteredByMonth = logs.filter(log => {
-                if (!log || !log.startTimeISO) return false;
+                if (!log) return false;
+                const timeStr = log.startTimeISO || log.startTimestamp;
+                if (!timeStr) return false;
                 if (!monthVal) return true;
-                return log.startTimeISO.startsWith(monthVal);
+                return timeStr.startsWith(monthVal);
             });
 
             let stats = {
@@ -657,7 +672,10 @@
 
             let displayLogs = filteredByMonth;
             if (dayVal) {
-                displayLogs = filteredByMonth.filter(log => log.startTimeISO.startsWith(dayVal));
+                displayLogs = filteredByMonth.filter(log => {
+                    const timeStr = log.startTimeISO || log.startTimestamp;
+                    return timeStr && timeStr.startsWith(dayVal);
+                });
             }
 
             const tbody = document.getElementById('logs-table-body');
@@ -677,7 +695,8 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50/80 transition-colors";
 
-                const startDate = new Date(log.startTimeISO);
+                const timeStr = log.startTimeISO || log.startTimestamp;
+                const startDate = new Date(timeStr);
                 const endDate = log.endTimeISO ? new Date(log.endTimeISO) : null;
 
                 const dateFormatted = formatDateTR(startDate);
@@ -773,7 +792,10 @@
         function exportToCSV() {
             const monthElem = document.getElementById('month-filter');
             const monthVal = monthElem ? monthElem.value : '';
-            const filteredLogs = logs.filter(log => log.startTimeISO && log.startTimeISO.startsWith(monthVal));
+            const filteredLogs = logs.filter(log => {
+                const timeStr = log.startTimeISO || log.startTimestamp;
+                return timeStr && timeStr.startsWith(monthVal);
+            });
 
             if (filteredLogs.length === 0) {
                 alert("Seçili aya ait dışa aktarılacak kayıt bulunamadı.");
@@ -784,7 +806,8 @@
             csvContent += "Tarih;İş İsmi;Başlangıç Saati;Bitiş Saati;Harcanan Süre (Saat:Dk:Sn);Toplam Saniye;Açıklama\n";
 
             filteredLogs.forEach(log => {
-                const startDate = new Date(log.startTimeISO);
+                const timeStr = log.startTimeISO || log.startTimestamp;
+                const startDate = new Date(timeStr);
                 const endDate = log.endTimeISO ? new Date(log.endTimeISO) : null;
 
                 const dateStr = formatDateTR(startDate);
@@ -853,10 +876,6 @@
             const s = String(dateObj.getSeconds()).padStart(2, '0');
             return `${h}:${m}:${s}`;
         }
-
-        (function formatDateTR(dateObj) {
-            // helper dummy
-        });
 
         function formatDateTR(dateObj) {
             if (isNaN(dateObj.getTime())) return '-';
