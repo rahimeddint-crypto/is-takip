@@ -3,114 +3,292 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>İş Takip ve Geçiş Programı</title>
+    <title>İş Geçiş ve Mesai Takip Programı</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        temizlik: {
+                            DEFAULT: '#0284c7',
+                            light: '#e0f2fe',
+                            dark: '#0369a1',
+                            border: '#38bdf8'
+                        },
+                        muhasebe: {
+                            DEFAULT: '#059669',
+                            light: '#d1fae5',
+                            dark: '#047857',
+                            border: '#34d399'
+                        },
+                        teknoloji: {
+                            DEFAULT: '#7c3aed',
+                            light: '#ede9fe',
+                            dark: '#6d28d9',
+                            border: '#a78bfa'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
+        body {
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        .pulse-active {
+            animation: pulse-border 2s infinite;
+        }
+
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+
         @media print {
-            .no-print { display: none !important; }
-            body { background: white !important; color: black !important; }
-            .print-shadow { box-shadow: none !important; border: 1px solid #ccc; }
+            body {
+                background: white !important;
+                color: black !important;
+                font-size: 12pt;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            .print-card {
+                border: 1px solid #cbd5e1 !important;
+                box-shadow: none !important;
+                break-inside: avoid;
+            }
+            .print-header {
+                text-align: center;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 10px;
+            }
+        }
+
+        .print-only {
+            display: none;
         }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between">
+<body class="min-h-screen flex flex-col font-sans antialiased">
 
-    <!-- Üst Bar -->
-    <header class="bg-slate-800 border-b border-slate-700 shadow-md sticky top-0 z-50 no-print">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-3">
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 text-white shadow-lg no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center space-x-3">
-                <div class="bg-emerald-500 text-slate-950 font-black px-3 py-1.5 rounded-lg text-lg tracking-wider shadow">İ-TAKİP</div>
+                <div class="p-2.5 bg-blue-600 rounded-xl shadow-md">
+                    <i class="fa-solid fa-business-time text-2xl text-white"></i>
+                </div>
                 <div>
-                    <h1 class="text-lg font-bold text-white leading-tight">İş Geçiş Takip Sistemi</h1>
-                    <p class="text-xs text-slate-400">Temizlik • Muhasebe • Teknoloji</p>
+                    <h1 class="text-xl font-bold leading-tight tracking-wide">İş Geçiş Takip Sistemi</h1>
+                    <p class="text-xs text-slate-400">Bulut Senkronize Görev & Zaman Yönetimi ☁️</p>
                 </div>
             </div>
-
-            <div class="bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 flex items-center space-x-4 shadow-inner">
-                <div class="text-right">
-                    <div id="live-date" class="text-xs text-slate-400 font-medium">--.--.----</div>
-                    <div id="live-time" class="text-xl font-mono font-bold text-emerald-400 tracking-wider">00:00:00</div>
-                </div>
-            </div>
-
+            
             <div class="flex items-center gap-2">
-                <button onclick="exportExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow flex items-center gap-1.5">
-                    📊 Excel (CSV) İndir
+                <button onclick="exportToCSV()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium rounded-lg shadow transition flex items-center gap-2">
+                    <i class="fa-solid fa-file-excel"></i> Excel (CSV) İndir
                 </button>
-                <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow flex items-center gap-1.5">
-                    🖨️ Yazdır / PDF
+                <button onclick="prepareAndPrint()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg shadow transition flex items-center gap-2">
+                    <i class="fa-solid fa-print"></i> Yazdır / PDF
                 </button>
             </div>
         </div>
     </header>
 
-    <!-- Ana İçerik -->
-    <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow space-y-6">
+    <!-- Main Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-        <div class="bg-gradient-to-r from-slate-800 to-slate-800/80 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 print-shadow">
-            <div class="flex items-center space-x-4 w-full md:w-auto">
-                <div id="active-indicator-dot" class="w-4 h-4 rounded-full bg-slate-500 animate-pulse"></div>
+        <div class="print-only print-header">
+            <h1 class="text-2xl font-bold text-slate-900">ÇALIŞMA VE İŞ GEÇİŞ RAPORU</h1>
+            <p id="print-subtitle" class="text-sm text-slate-600 mt-1">Aylık Özet ve Detaylı Zaman Kayıtları</p>
+            <p id="print-date-generated" class="text-xs text-slate-500 mt-1"></p>
+        </div>
+
+        <!-- Section 1: Live Clock & Active Status Dashboard -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 no-print">
+            <div class="bg-slate-900 text-white p-6 rounded-2xl shadow-xl border border-slate-800 flex flex-col justify-between relative overflow-hidden">
+                <div class="absolute -right-6 -bottom-6 opacity-10 text-9xl text-blue-400 font-mono pointer-events-none">
+                    <i class="fa-regular fa-clock"></i>
+                </div>
                 <div>
-                    <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Şu An Yapılan İş</span>
-                    <h2 id="current-task-name" class="text-2xl font-black text-white">Yükleniyor...</h2>
+                    <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                        <span><i class="fa-regular fa-calendar-days mr-1.5"></i> Güncel Tarih</span>
+                        <span id="live-day-name" class="text-blue-400 font-bold">--</span>
+                    </div>
+                    <div id="live-date" class="text-lg font-semibold text-slate-200">--</div>
+                </div>
+                <div class="mt-4 my-2">
+                    <div id="live-clock" class="text-4xl sm:text-5xl font-extrabold font-mono text-blue-400 tracking-tight">
+                        00:00:00
+                    </div>
+                </div>
+                <div class="text-xs text-slate-400 flex items-center gap-1.5">
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>Bulut Canlı Senkronizasyon Aktif</span>
                 </div>
             </div>
-            <div class="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-slate-700">
-                <div class="text-left md:text-right">
-                    <span class="text-xs text-slate-400 block">Başlangıç Saati</span>
-                    <span id="current-task-start" class="font-mono text-base font-bold text-slate-200">--:--:--</span>
+
+            <div id="active-task-card" class="md:col-span-2 bg-white p-6 rounded-2xl shadow-md border-2 border-slate-200 flex flex-col justify-between transition-all duration-300">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Şu An Yapılan İş</span>
+                        <h2 id="active-task-title" class="text-2xl sm:text-3xl font-extrabold text-slate-800">
+                            Yükleniyor...
+                        </h2>
+                    </div>
+                    <span id="active-task-badge" class="px-3 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                        Pasif
+                    </span>
                 </div>
-                <div class="text-left md:text-right">
-                    <span class="text-xs text-slate-400 block">Geçen Süre</span>
-                    <span id="current-task-duration" class="font-mono text-lg font-extrabold text-emerald-400">00:00:00</span>
+
+                <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+                    <div>
+                        <span class="text-xs text-slate-500 block">Başlangıç Saati</span>
+                        <span id="active-task-start" class="text-base font-mono font-bold text-slate-700">--:--:--</span>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-500 block">Geçen Süre (Bu İş)</span>
+                        <span id="active-task-timer" class="text-base font-mono font-bold text-blue-600">00:00:00</span>
+                    </div>
+                    <div class="col-span-2 sm:col-span-1">
+                        <button id="stop-task-btn" onclick="stopCurrentTask()" class="hidden w-full px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg border border-red-200 transition">
+                            <i class="fa-solid fa-circle-stop mr-1"></i> Görevi Bitir
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 no-print">
-            <button onclick="switchTask('Temizlik')" id="btn-Temizlik" class="group relative bg-slate-800 hover:bg-slate-750 border-2 border-slate-700 hover:border-blue-500 p-5 rounded-2xl transition-all duration-200 text-left shadow-lg flex flex-col justify-between overflow-hidden">
-                <div class="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/25 transition"></div>
-                <span class="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3 block">1. İş</span>
-                <div class="flex justify-between items-end">
-                    <span class="text-xl font-bold text-white">🧹 Temizlik</span>
-                    <span class="text-xs bg-blue-500/20 text-blue-300 px-2.5 py-1 rounded-lg font-medium">Geçiş Yap</span>
-                </div>
-            </button>
+        <!-- Section 2: Task Transition Buttons -->
+        <div class="no-print">
+            <h3 class="text-sm font-bold text-slate-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-hand-pointer text-blue-600"></i> İş Geçiş Butonları (Tıkla ve Geç)
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <button onclick="switchTask('Temizlik')" id="btn-temizlik" class="group relative bg-white hover:bg-temizlik-light border-2 border-slate-200 hover:border-temizlik text-slate-800 p-5 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col items-center justify-center text-center">
+                    <div class="p-3 rounded-full bg-sky-100 text-temizlik mb-3 group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-broom text-2xl sm:text-3xl"></i>
+                    </div>
+                    <span class="text-lg font-bold text-slate-800">TEMİZLİK</span>
+                    <span class="text-xs text-slate-500 mt-1">Görevler & Düzenleme</span>
+                </button>
 
-            <button onclick="switchTask('Muhasebe')" id="btn-Muhasebe" class="group relative bg-slate-800 hover:bg-slate-750 border-2 border-slate-700 hover:border-amber-500 p-5 rounded-2xl transition-all duration-200 text-left shadow-lg flex flex-col justify-between overflow-hidden">
-                <div class="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/25 transition"></div>
-                <span class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3 block">2. İş</span>
-                <div class="flex justify-between items-end">
-                    <span class="text-xl font-bold text-white">📑 Muhasebe</span>
-                    <span class="text-xs bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-lg font-medium">Geçiş Yap</span>
-                </div>
-            </button>
+                <button onclick="switchTask('Muhasebe')" id="btn-muhasebe" class="group relative bg-white hover:bg-muhasebe-light border-2 border-slate-200 hover:border-muhasebe text-slate-800 p-5 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col items-center justify-center text-center">
+                    <div class="p-3 rounded-full bg-emerald-100 text-muhasebe mb-3 group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-calculator text-2xl sm:text-3xl"></i>
+                    </div>
+                    <span class="text-lg font-bold text-slate-800">MUHASEBE</span>
+                    <span class="text-xs text-slate-500 mt-1">Hesap & Finans</span>
+                </button>
 
-            <button onclick="switchTask('Teknoloji')" id="btn-Teknoloji" class="group relative bg-slate-800 hover:bg-slate-750 border-2 border-slate-700 hover:border-purple-500 p-5 rounded-2xl transition-all duration-200 text-left shadow-lg flex flex-col justify-between overflow-hidden">
-                <div class="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-xl group-hover:bg-purple-500/25 transition"></div>
-                <span class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-3 block">3. İş</span>
-                <div class="flex justify-between items-end">
-                    <span class="text-xl font-bold text-white">💻 Teknoloji</span>
-                    <span class="text-xs bg-purple-500/20 text-purple-300 px-2.5 py-1 rounded-lg font-medium">Geçiş Yap</span>
-                </div>
-            </button>
+                <button onclick="switchTask('Teknoloji')" id="btn-teknoloji" class="group relative bg-white hover:bg-teknoloji-light border-2 border-slate-200 hover:border-teknoloji text-slate-800 p-5 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col items-center justify-center text-center">
+                    <div class="p-3 rounded-full bg-purple-100 text-teknoloji mb-3 group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-laptop-code text-2xl sm:text-3xl"></i>
+                    </div>
+                    <span class="text-lg font-bold text-slate-800">TEKNOLOJİ</span>
+                    <span class="text-xs text-slate-500 mt-1">Sistem & Bilgi İşlem</span>
+                </button>
+            </div>
         </div>
 
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg print-shadow">
-            <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4 pb-4 border-b border-slate-700">
+        <!-- Section 3: Monthly Summary Statistics -->
+        <div class="bg-white rounded-2xl shadow-md border border-slate-200 p-5 print-card">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pb-3 border-b border-slate-100">
                 <div>
-                    <h3 class="text-lg font-bold text-white">Geçmiş Geçiş ve Süre Kayıtları</h3>
-                    <p class="text-xs text-slate-400">Bulut senkronize ortak geçiş günlüğü.</p>
+                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-blue-600 no-print"></i> 
+                        Aylık Çalışma Özeti
+                    </h3>
+                    <p class="text-xs text-slate-500">Seçili ay için iş bazında harcanan toplam süreler</p>
                 </div>
-                <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
-                    <select id="month-filter" onchange="renderTable()" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 outline-none focus:border-emerald-500">
-                    </select>
-                    <button onclick="clearHistory()" class="no-print bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs px-3 py-2 rounded-xl transition font-medium">
-                        🗑️ Tüm Kayıtları Sıfırla
+
+                <div class="flex items-center gap-2 no-print">
+                    <label for="month-filter" class="text-xs font-semibold text-slate-600">Ay Seçiniz:</label>
+                    <input type="month" id="month-filter" onchange="renderApp()" class="border border-slate-300 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div class="p-4 rounded-xl bg-sky-50 border border-sky-100">
+                    <div class="flex items-center justify-between text-sky-800 text-xs font-bold">
+                        <span>TEMİZLİK</span>
+                        <i class="fa-solid fa-broom"></i>
+                    </div>
+                    <div id="stat-temizlik" class="text-xl sm:text-2xl font-extrabold text-sky-900 mt-2 font-mono">0 saat 0 dk</div>
+                    <div id="stat-temizlik-count" class="text-[11px] text-sky-600 mt-0.5">0 geçiş kaydı</div>
+                </div>
+
+                <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <div class="flex items-center justify-between text-emerald-800 text-xs font-bold">
+                        <span>MUHASEBE</span>
+                        <i class="fa-solid fa-calculator"></i>
+                    </div>
+                    <div id="stat-muhasebe" class="text-xl sm:text-2xl font-extrabold text-emerald-900 mt-2 font-mono">0 saat 0 dk</div>
+                    <div id="stat-muhasebe-count" class="text-[11px] text-emerald-600 mt-0.5">0 geçiş kaydı</div>
+                </div>
+
+                <div class="p-4 rounded-xl bg-purple-50 border border-purple-100">
+                    <div class="flex items-center justify-between text-purple-800 text-xs font-bold">
+                        <span>TEKNOLOJİ</span>
+                        <i class="fa-solid fa-laptop-code"></i>
+                    </div>
+                    <div id="stat-teknoloji" class="text-xl sm:text-2xl font-extrabold text-purple-900 mt-2 font-mono">0 saat 0 dk</div>
+                    <div id="stat-teknoloji-count" class="text-[11px] text-purple-600 mt-0.5">0 geçiş kaydı</div>
+                </div>
+
+                <div class="p-4 rounded-xl bg-slate-900 text-white shadow-inner">
+                    <div class="flex items-center justify-between text-slate-300 text-xs font-bold">
+                        <span>TOPLAM MESAİ</span>
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                    <div id="stat-total" class="text-xl sm:text-2xl font-extrabold text-blue-400 mt-2 font-mono">0 saat 0 dk</div>
+                    <div id="stat-total-count" class="text-[11px] text-slate-400 mt-0.5">Toplam 0 işlem</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 4: Daily Log Table -->
+        <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden print-card">
+            <div class="p-5 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-blue-600 no-print"></i>
+                        İş Geçiş ve Zaman Kayıt Günlüğü
+                    </h3>
+                    <p class="text-xs text-slate-500">Tüm geçiş saatleri bulut veritabanında saklanır ve anlık senkronize edilir.</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 no-print">
+                    <input type="date" id="day-filter" onchange="renderApp()" class="border border-slate-300 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button onclick="clearDayFilter()" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs rounded-lg font-medium transition" title="Günü Temizle / Tüm Ayı Göster">
+                        <i class="fa-solid fa-filter-circle-xmark mr-1"></i> Tüm Ay
+                    </button>
+                    <button onclick="openManualAddModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-lg shadow transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i> Manuel Kayıt Ekle
                     </button>
                 </div>
             </div>
@@ -118,30 +296,92 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
-                        <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wider">
-                            <th class="py-3 px-4 font-semibold">Tarih</th>
-                            <th class="py-3 px-4 font-semibold">İş Adı</th>
-                            <th class="py-3 px-4 font-semibold">Başlangıç</th>
-                            <th class="py-3 px-4 font-semibold">Bitiş</th>
-                            <th class="py-3 px-4 font-semibold text-right">Toplam Süre</th>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                            <th class="py-3 px-4">Tarih</th>
+                            <th class="py-3 px-4">Yapılan İş</th>
+                            <th class="py-3 px-4">Başlangıç</th>
+                            <th class="py-3 px-4">Bitiş</th>
+                            <th class="py-3 px-4">Süre</th>
+                            <th class="py-3 px-4">Not / Açıklama</th>
+                            <th class="py-3 px-4 text-right no-print">İşlem</th>
                         </tr>
                     </thead>
-                    <tbody id="log-table-body" class="divide-y divide-slate-750 text-sm text-slate-300 font-mono">
+                    <tbody id="logs-table-body" class="divide-y divide-slate-100 text-xs sm:text-sm">
                         <tr>
-                            <td colspan="5" class="text-center py-6 text-slate-500 italic font-sans">Yükleniyor...</td>
+                            <td colspan="7" class="text-center py-6 text-slate-400 italic">Veriler yükleniyor...</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
+
+            <div id="empty-state" class="hidden p-8 text-center text-slate-400">
+                <i class="fa-regular fa-folder-open text-4xl mb-2"></i>
+                <p class="text-sm font-medium">Bu tarihe ait gösterilecek iş geçiş kaydı bulunamadı.</p>
+            </div>
         </div>
+
     </main>
 
-    <footer class="bg-slate-800 border-t border-slate-700 py-4 text-center text-xs text-slate-500 no-print">
-        İş Takip Programı &bull; Bulut Senkronize Aktif ☁️
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-8 no-print">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <span>&copy; İş Geçiş ve Mesai Takip Programı - Firebase Bulut Senkronizasyonu Aktif ☁️</span>
+            <button onclick="confirmResetData()" class="text-red-500 hover:text-red-700 underline font-medium">
+                Tüm Geçmiş Verileri Temizle
+            </button>
+        </div>
     </footer>
 
+    <!-- Modal: Manual Log Entry -->
+    <div id="manual-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="text-base font-bold text-slate-800">Geçmişe Dönük Manuel Kayıt Ekle</h3>
+                <button onclick="closeManualAddModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <form id="manual-form" onsubmit="handleManualSubmit(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">İş İsmi</label>
+                    <select id="manual-task" required class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <option value="Temizlik">Temizlik</option>
+                        <option value="Muhasebe">Muhasebe</option>
+                        <option value="Teknoloji">Teknoloji</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Tarih</label>
+                    <input type="date" id="manual-date" required class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Başlangıç Saati</label>
+                        <input type="time" step="1" id="manual-start" required class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Bitiş Saati</label>
+                        <input type="time" step="1" id="manual-end" required class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Not / Açıklama (İsteğe Bağlı)</label>
+                    <input type="text" id="manual-note" placeholder="Örn: Unutulan kayıt elle eklendi" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" onclick="closeManualAddModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg">İptal</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Logic with Firebase Integration -->
     <script>
-        // Yeni Firebase Veritabanı Bilgileriniz Entegre Edildi (is-takip-appa)
+        // Yeni Firebase Veritabanı Bilgileriniz Entegre Edildi
         const firebaseConfig = {
             apiKey: "AIzaSyAO2a5rV-xN6etKlfr3drW_1s5Dk3UY_1M",
             authDomain: "is-takip-appa.firebaseapp.com",
@@ -156,186 +396,437 @@
         const db = firebase.database();
 
         let logs = [];
-        let activeTask = null;
+        let activeTask = null; // { taskName, startTimeISO }
 
-        db.ref('is_takip/logs').on('value', (snapshot) => {
-            const data = snapshot.val();
-            logs = data ? Object.values(data) : [];
-            logs.sort((a, b) => b.id - a.id);
-            populateMonthFilter();
-            renderTable();
-        }, (error) => {
-            console.error(error);
-            document.getElementById('log-table-body').innerHTML = `<tr><td colspan="5" class="text-center py-6 text-rose-400 italic font-sans">Bağlantı kurulamadı.</td></tr>`;
+        const taskConfig = {
+            'Temizlik': {
+                colorClass: 'bg-sky-100 text-sky-800 border-sky-300',
+                badgeClass: 'bg-sky-600 text-white',
+                btnActiveBorder: 'border-sky-500 bg-sky-50 ring-2 ring-sky-400'
+            },
+            'Muhasebe': {
+                colorClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                badgeClass: 'bg-emerald-600 text-white',
+                btnActiveBorder: 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400'
+            },
+            'Teknoloji': {
+                colorClass: 'bg-purple-100 text-purple-800 border-purple-300',
+                badgeClass: 'bg-purple-600 text-white',
+                btnActiveBorder: 'border-purple-500 bg-purple-50 ring-2 ring-purple-400'
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initMonthFilter();
+            startLiveClock();
+            initFirebaseListeners();
         });
 
-        db.ref('is_takip/activeTask').on('value', (snapshot) => {
-            activeTask = snapshot.val();
-            updateActiveUI();
-        });
+        // Firebase Realtime Database Listeners
+        function initFirebaseListeners() {
+            // Listen to logs
+            db.ref('is_takip/logs').on('value', (snapshot) => {
+                const data = snapshot.val();
+                logs = data ? Object.values(data) : [];
+                logs.sort((a, b) => new Date(b.startTimeISO) - new Date(a.startTimeISO));
+                renderApp();
+            }, (error) => {
+                console.error("Firebase log okuma hatası:", error);
+            });
 
-        setInterval(() => {
+            // Listen to active task
+            db.ref('is_takip/activeTask').on('value', (snapshot) => {
+                activeTask = snapshot.val();
+                renderActiveTaskUI();
+            }, (error) => {
+                console.error("Firebase aktif görev okuma hatası:", error);
+            });
+        }
+
+        function initMonthFilter() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            document.getElementById('month-filter').value = `${year}-${month}`;
+            document.getElementById('manual-date').value = `${year}-${month}-${String(today.getDate()).padStart(2, '0')}`;
+        }
+
+        function startLiveClock() {
+            const daysTR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+            const monthsTR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+            setInterval(() => {
+                const now = new Date();
+                
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                document.getElementById('live-clock').innerText = `${hours}:${minutes}:${seconds}`;
+
+                const dayName = daysTR[now.getDay()];
+                const dateStr = `${now.getDate()} ${monthsTR[now.getMonth()]} ${now.getFullYear()}`;
+                document.getElementById('live-day-name').innerText = dayName;
+                document.getElementById('live-date').innerText = dateStr;
+
+                if (activeTask && activeTask.startTimeISO) {
+                    const startMs = new Date(activeTask.startTimeISO).getTime();
+                    const nowMs = now.getTime();
+                    const diffSec = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+                    document.getElementById('active-task-timer').innerText = formatSecondsToHMS(diffSec);
+                }
+            }, 1000);
+        }
+
+        // Switch or Start Task (Writes to Firebase)
+        function switchTask(newTaskName) {
             const now = new Date();
-            document.getElementById('live-date').innerText = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            document.getElementById('live-time').innerText = now.toTimeString().split(' ')[0] + '.' + String(Math.floor(now.getMilliseconds() / 100)).padStart(1, '0');
+            const nowISO = now.toISOString();
 
             if (activeTask) {
-                const startTime = new Date(activeTask.startTimestamp);
-                const diffSec = Math.floor((now - startTime) / 1000);
-                if (diffSec >= 0) {
-                    const h = String(Math.floor(diffSec / 3600)).padStart(2, '0');
-                    const m = String(Math.floor((diffSec % 3600) / 60)).padStart(2, '0');
-                    const s = String(diffSec % 60).padStart(2, '0');
-                    document.getElementById('current-task-duration').innerText = `${h}:${m}:${s}`;
-                }
-            }
-        }, 100);
+                if (activeTask.taskName === newTaskName) return;
 
-        function switchTask(taskName) {
-            const now = new Date();
-            const timestampNow = now.toISOString();
-            const timeStringFormatted = now.toTimeString().split(' ')[0] + '.' + String(Math.floor(now.getMilliseconds() / 100)).padStart(1, '0');
-            const dateStringFormatted = now.toLocaleDateString('tr-TR');
+                const startTime = new Date(activeTask.startTimeISO);
+                const durationSeconds = Math.max(1, Math.floor((now.getTime() - startTime.getTime()) / 1000));
 
-            if (activeTask && activeTask.name !== taskName) {
-                const startObj = new Date(activeTask.startTimestamp);
-                const durationSec = Math.floor((now - startObj) / 1000);
-                
-                const newLog = {
-                    id: Date.now(),
-                    date: dateStringFormatted,
-                    task: activeTask.name,
-                    start: activeTask.startTimeFormatted,
-                    end: timeStringFormatted,
-                    durationSec: durationSec,
-                    durationFormatted: formatSeconds(durationSec),
-                    sortMonth: now.toISOString().slice(0, 7)
+                const logEntry = {
+                    id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                    taskName: activeTask.taskName,
+                    startTimeISO: activeTask.startTimeISO,
+                    endTimeISO: nowISO,
+                    durationSeconds: durationSeconds,
+                    note: 'İş geçişi yapıldı'
                 };
-                
-                db.ref('is_takip/logs/' + newLog.id).set(newLog);
+
+                db.ref('is_takip/logs/' + logEntry.id).set(logEntry);
             }
 
             const newActive = {
-                name: taskName,
-                startTimestamp: timestampNow,
-                startTimeFormatted: timeStringFormatted,
-                sortMonth: now.toISOString().slice(0, 7)
+                taskName: newTaskName,
+                startTimeISO: nowISO
             };
 
             db.ref('is_takip/activeTask').set(newActive);
         }
 
-        function updateActiveUI() {
-            ['Temizlik', 'Muhasebe', 'Teknoloji'].forEach(t => {
-                const btn = document.getElementById(`btn-${t}`);
-                if (btn) btn.classList.remove('border-emerald-500', 'bg-slate-750');
+        // Stop current running task
+        function stopCurrentTask() {
+            if (!activeTask) return;
+
+            const now = new Date();
+            const nowISO = now.toISOString();
+            const startTime = new Date(activeTask.startTimeISO);
+            const durationSeconds = Math.max(1, Math.floor((now.getTime() - startTime.getTime()) / 1000));
+
+            const logEntry = {
+                id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                taskName: activeTask.taskName,
+                startTimeISO: activeTask.startTimeISO,
+                endTimeISO: nowISO,
+                durationSeconds: durationSeconds,
+                note: 'Görevi bitirme işlemi'
+            };
+
+            db.ref('is_takip/logs/' + logEntry.id).set(logEntry);
+            db.ref('is_takip/activeTask').set(null);
+        }
+
+        function renderApp() {
+            renderActiveTaskUI();
+            renderStatsAndTable();
+        }
+
+        function renderActiveTaskUI() {
+            const activeCard = document.getElementById('active-task-card');
+            const titleEl = document.getElementById('active-task-title');
+            const badgeEl = document.getElementById('active-task-badge');
+            const startEl = document.getElementById('active-task-start');
+            const timerEl = document.getElementById('active-task-timer');
+            const stopBtn = document.getElementById('stop-task-btn');
+
+            ['temizlik', 'muhasebe', 'teknoloji'].forEach(job => {
+                const btn = document.getElementById(`btn-${job}`);
+                if(btn) {
+                    btn.className = `group relative bg-white hover:bg-${job}-light border-2 border-slate-200 text-slate-800 p-5 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col items-center justify-center text-center`;
+                }
             });
 
             if (activeTask) {
-                document.getElementById('current-task-name').innerText = activeTask.name;
-                document.getElementById('current-task-start').innerText = activeTask.startTimeFormatted;
-                document.getElementById('active-indicator-dot').className = "w-4 h-4 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]";
+                const config = taskConfig[activeTask.taskName] || {};
+                const startDate = new Date(activeTask.startTimeISO);
+
+                titleEl.innerText = activeTask.taskName;
+                titleEl.className = "text-2xl sm:text-3xl font-extrabold text-slate-900";
+
+                badgeEl.innerText = "Şu An Devam Ediyor";
+                badgeEl.className = `px-3 py-1 text-xs font-bold rounded-full ${config.badgeClass}`;
+
+                startEl.innerText = formatTimeOnly(startDate);
                 
-                const activeBtn = document.getElementById(`btn-${activeTask.name}`);
+                const diffSec = Math.max(0, Math.floor((new Date().getTime() - startDate.getTime()) / 1000));
+                timerEl.innerText = formatSecondsToHMS(diffSec);
+
+                stopBtn.classList.remove('hidden');
+
+                const activeBtnId = `btn-${activeTask.taskName.toLowerCase()}`;
+                const activeBtn = document.getElementById(activeBtnId);
                 if (activeBtn) {
-                    activeBtn.classList.add('border-emerald-500', 'bg-slate-750');
+                    activeBtn.className += ` ${config.btnActiveBorder} pulse-active`;
                 }
+
+                activeCard.className = `md:col-span-2 bg-white p-6 rounded-2xl shadow-lg border-2 ${config.colorClass} flex flex-col justify-between transition-all duration-300`;
+
             } else {
-                document.getElementById('current-task-name').innerText = "Seçim Yapılmadı";
-                document.getElementById('current-task-start').innerText = "--:--:--";
-                document.getElementById('current-task-duration').innerText = "00:00:00";
-                document.getElementById('active-indicator-dot').className = "w-4 h-4 rounded-full bg-slate-500";
+                titleEl.innerText = "Aktif Çalışma Yok";
+                titleEl.className = "text-2xl sm:text-3xl font-extrabold text-slate-400";
+
+                badgeEl.innerText = "Pasif / Beklemede";
+                badgeEl.className = "px-3 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-500 border border-slate-200";
+
+                startEl.innerText = "--:--:--";
+                timerEl.innerText = "00:00:00";
+                stopBtn.classList.add('hidden');
+
+                activeCard.className = "md:col-span-2 bg-white p-6 rounded-2xl shadow-md border-2 border-slate-200 flex flex-col justify-between transition-all duration-300";
             }
         }
 
-        function formatSeconds(sec) {
-            const h = Math.floor(sec / 3600);
-            const m = Math.floor((sec % 3600) / 60);
-            const s = sec % 60;
-            if (h > 0) return `${h} sa ${m} dk ${s} sn`;
-            if (m > 0) return `${m} dk ${s} sn`;
-            return `${s} sn`;
-        }
+        function renderStatsAndTable() {
+            const monthVal = document.getElementById('month-filter').value;
+            const dayVal = document.getElementById('day-filter').value;
 
-        function populateMonthFilter() {
-            const monthFilter = document.getElementById('month-filter');
-            if (!monthFilter) return;
-            const currentSelection = monthFilter.value;
-            
-            const months = [...new Set(logs.map(l => l.sortMonth))];
-            const currentMonthKey = new Date().toISOString().slice(0, 7);
-            if (!months.includes(currentMonthKey)) months.unshift(currentMonthKey);
-            
-            months.sort().reverse();
-
-            monthFilter.innerHTML = '<option value="ALL">Tüm Zamanlar</option>';
-            months.forEach(m => {
-                const [year, month] = m.split('-');
-                const dateObj = new Date(year, month - 1);
-                const monthName = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
-                const opt = document.createElement('option');
-                opt.value = m;
-                opt.innerText = monthName;
-                monthFilter.appendChild(opt);
+            const filteredByMonth = logs.filter(log => {
+                if (!log.startTimeISO) return false;
+                return log.startTimeISO.startsWith(monthVal);
             });
 
-            if (currentSelection && months.includes(currentSelection)) {
-                monthFilter.value = currentSelection;
+            let stats = {
+                'Temizlik': { totalSec: 0, count: 0 },
+                'Muhasebe': { totalSec: 0, count: 0 },
+                'Teknoloji': { totalSec: 0, count: 0 },
+                'GrandTotal': { totalSec: 0, count: 0 }
+            };
+
+            filteredByMonth.forEach(log => {
+                if (stats[log.taskName]) {
+                    stats[log.taskName].totalSec += (log.durationSeconds || 0);
+                    stats[log.taskName].count += 1;
+                }
+                stats.GrandTotal.totalSec += (log.durationSeconds || 0);
+                stats.GrandTotal.count += 1;
+            });
+
+            document.getElementById('stat-temizlik').innerText = formatSecondsToReadable(stats['Temizlik'].totalSec);
+            document.getElementById('stat-temizlik-count').innerText = `${stats['Temizlik'].count} geçiş kaydı`;
+
+            document.getElementById('stat-muhasebe').innerText = formatSecondsToReadable(stats['Muhasebe'].totalSec);
+            document.getElementById('stat-muhasebe-count').innerText = `${stats['Muhasebe'].count} geçiş kaydı`;
+
+            document.getElementById('stat-teknoloji').innerText = formatSecondsToReadable(stats['Teknoloji'].totalSec);
+            document.getElementById('stat-teknoloji-count').innerText = `${stats['Teknoloji'].count} geçiş kaydı`;
+
+            document.getElementById('stat-total').innerText = formatSecondsToReadable(stats.GrandTotal.totalSec);
+            document.getElementById('stat-total-count').innerText = `Toplam ${stats.GrandTotal.count} işlem`;
+
+            let displayLogs = filteredByMonth;
+            if (dayVal) {
+                displayLogs = filteredByMonth.filter(log => log.startTimeISO.startsWith(dayVal));
+            }
+
+            const tbody = document.getElementById('logs-table-body');
+            const emptyState = document.getElementById('empty-state');
+            tbody.innerHTML = '';
+
+            if (displayLogs.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            displayLogs.forEach(log => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition-colors";
+
+                const startDate = new Date(log.startTimeISO);
+                const endDate = log.endTimeISO ? new Date(log.endTimeISO) : null;
+
+                const dateFormatted = formatDateTR(startDate);
+                const startTimeStr = formatTimeOnly(startDate);
+                const endTimeStr = endDate ? formatTimeOnly(endDate) : 'Devam ediyor';
+                const durationStr = formatSecondsToHMS(log.durationSeconds || 0);
+
+                let badgeClass = "bg-slate-100 text-slate-800";
+                if (log.taskName === 'Temizlik') badgeClass = "bg-sky-100 text-sky-800 border-sky-200";
+                if (log.taskName === 'Muhasebe') badgeClass = "bg-emerald-100 text-emerald-800 border-emerald-200";
+                if (log.taskName === 'Teknoloji') badgeClass = "bg-purple-100 text-purple-800 border-purple-200";
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-medium text-slate-600 whitespace-nowrap">${dateFormatted}</td>
+                    <td class="py-3 px-4 font-bold whitespace-nowrap">
+                        <span class="px-2.5 py-1 rounded-md text-xs border ${badgeClass}">
+                            ${escapeHtml(log.taskName)}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 font-mono text-slate-700 whitespace-nowrap">${startTimeStr}</td>
+                    <td class="py-3 px-4 font-mono text-slate-700 whitespace-nowrap">${endTimeStr}</td>
+                    <td class="py-3 px-4 font-mono font-bold text-slate-900 whitespace-nowrap">${durationStr}</td>
+                    <td class="py-3 px-4 text-slate-500 max-w-xs truncate">${escapeHtml(log.note || '-')}</td>
+                    <td class="py-3 px-4 text-right no-print whitespace-nowrap">
+                        <button onclick="deleteLog('${log.id}')" class="text-slate-400 hover:text-red-600 p-1 transition" title="Kaydı Sil">
+                            <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function clearDayFilter() {
+            document.getElementById('day-filter').value = '';
+            renderApp();
+        }
+
+        function deleteLog(id) {
+            if (confirm("Bu kayıt buluttan silinsin mi?")) {
+                db.ref('is_takip/logs/' + id).remove();
             }
         }
 
-        function renderTable() {
-            const tbody = document.getElementById('log-table-body');
-            const monthFilterElem = document.getElementById('month-filter');
-            if (!tbody || !monthFilterElem) return;
-            
-            const selectedMonth = monthFilterElem.value;
+        function openManualAddModal() {
+            document.getElementById('manual-modal').classList.remove('hidden');
+        }
 
-            let filteredLogs = logs;
-            if (selectedMonth && selectedMonth !== 'ALL') {
-                filteredLogs = logs.filter(l => l.sortMonth === selectedMonth);
+        function closeManualAddModal() {
+            document.getElementById('manual-modal').classList.add('hidden');
+        }
+
+        function handleManualSubmit(e) {
+            e.preventDefault();
+            const task = document.getElementById('manual-task').value;
+            const dateVal = document.getElementById('manual-date').value;
+            const startVal = document.getElementById('manual-start').value;
+            const endVal = document.getElementById('manual-end').value;
+            const noteVal = document.getElementById('manual-note').value;
+
+            if (!dateVal || !startVal || !endVal) return;
+
+            const startISO = new Date(`${dateVal}T${startVal}`).toISOString();
+            const endISO = new Date(`${dateVal}T${endVal}`).toISOString();
+
+            const startMs = new Date(startISO).getTime();
+            const endMs = new Date(endISO).getTime();
+
+            if (endMs <= startMs) {
+                alert("Bitiş saati başlangıç saatinden sonra olmalıdır!");
+                return;
             }
+
+            const durationSeconds = Math.floor((endMs - startMs) / 1000);
+
+            const newLog = {
+                id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                taskName: task,
+                startTimeISO: startISO,
+                endTimeISO: endISO,
+                durationSeconds: durationSeconds,
+                note: noteVal || 'Manuel Eklendi'
+            };
+
+            db.ref('is_takip/logs/' + newLog.id).set(newLog);
+            closeManualAddModal();
+        }
+
+        function exportToCSV() {
+            const monthVal = document.getElementById('month-filter').value;
+            const filteredLogs = logs.filter(log => log.startTimeISO && log.startTimeISO.startsWith(monthVal));
 
             if (filteredLogs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500 italic font-sans">Kayıt bulunamadı.</td></tr>`;
+                alert("Seçili aya ait dışa aktarılacak kayıt bulunamadı.");
                 return;
             }
 
-            tbody.innerHTML = filteredLogs.map(l => `
-                <tr class="hover:bg-slate-750/50 transition">
-                    <td class="py-3 px-4 text-slate-400 text-xs">${l.date}</td>
-                    <td class="py-3 px-4 font-bold text-white font-sans">${l.task}</td>
-                    <td class="py-3 px-4 text-emerald-400">${l.start}</td>
-                    <td class="py-3 px-4 text-rose-400">${l.end}</td>
-                    <td class="py-3 px-4 text-right font-semibold text-slate-200">${l.durationFormatted}</td>
-                </tr>
-            `).join('');
-        }
+            let csvContent = "\uFEFF";
+            csvContent += "Tarih;İş İsmi;Başlangıç Saati;Bitiş Saati;Harcanan Süre (Saat:Dk:Sn);Toplam Saniye;Açıklama\n";
 
-        function clearHistory() {
-            if (confirm("Buluttaki tüm geçmiş kayıtları silmek istediğinize emin misiniz?")) {
-                db.ref('is_takip').remove();
-            }
-        }
+            filteredLogs.forEach(log => {
+                const startDate = new Date(log.startTimeISO);
+                const endDate = log.endTimeISO ? new Date(log.endTimeISO) : null;
 
-        function exportExcel() {
-            if (logs.length === 0) {
-                alert("Dışa aktarılacak kayıt bulunmuyor.");
-                return;
-            }
+                const dateStr = formatDateTR(startDate);
+                const startStr = formatTimeOnly(startDate);
+                const endStr = endDate ? formatTimeOnly(endDate) : 'Devam ediyor';
+                const durationHMS = formatSecondsToHMS(log.durationSeconds || 0);
+                const note = (log.note || '').replace(/;/g, ',');
 
-            let csvContent = "\uFEFFTarih;İş Adı;Başlangıç Saati;Bitiş Saati;Toplam Süre\n";
-            logs.forEach(l => {
-                csvContent += `"${l.date}";"${l.task}";"${l.start}";"${l.end}";"${l.durationFormatted}"\n`;
+                csvContent += `"${dateStr}";"${log.taskName}";"${startStr}";"${endStr}";"${durationHMS}";"${log.durationSeconds || 0}";"${note}"\n`;
             });
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `is-takip-raporu-${new Date().toISOString().slice(0, 10)}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Is_Gecis_Raporu_${monthVal}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function prepareAndPrint() {
+            const monthVal = document.getElementById('month-filter').value;
+            const dateGeneratedEl = document.getElementById('print-date-generated');
+            const subtitleEl = document.getElementById('print-subtitle');
+
+            const [year, month] = monthVal.split('-');
+            const monthsTR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+            const monthName = monthsTR[parseInt(month, 10) - 1];
+
+            subtitleEl.innerText = `${monthName} ${year} Dönemi İş Geçiş ve Çalışma Süresi Raporu`;
+            dateGeneratedEl.innerText = `Rapor Oluşturulma Tarihi: ${new Date().toLocaleString('tr-TR')}`;
+
+            window.print();
+        }
+
+        function confirmResetData() {
+            if (confirm("Buluttaki tüm geçmiş kayıtları ve aktif görevi silmek istediğinize emin misiniz? Bu işlem geri alınamaz!")) {
+                db.ref('is_takip').remove();
+            }
+        }
+
+        function formatSecondsToHMS(totalSec) {
+            const hrs = Math.floor(totalSec / 3600);
+            const mins = Math.floor((totalSec % 3600) / 60);
+            const secs = totalSec % 60;
+            return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function formatSecondsToReadable(totalSec) {
+            const hrs = Math.floor(totalSec / 3600);
+            const mins = Math.floor((totalSec % 3600) / 60);
+            if (hrs === 0 && mins === 0) return `${totalSec} sn`;
+            return `${hrs} sa ${mins} dk`;
+        }
+
+        function formatTimeOnly(dateObj) {
+            const h = String(dateObj.getHours()).padStart(2, '0');
+            const m = String(dateObj.getMinutes()).padStart(2, '0');
+            const s = String(dateObj.getSeconds()).padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        function formatDateTR(dateObj) {
+            const d = String(dateObj.getDate()).padStart(2, '0');
+            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const y = dateObj.getFullYear();
+            return `${d}.${m}.${y}`;
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
     </script>
 </body>
